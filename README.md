@@ -24,8 +24,34 @@ You can also use the extractor directly via the command line:
 PtpExtractor.exe "C:\path\to\your_livery.ptp" [optional_output_directory]
 ```
 
-## Installation into MSFS
-After the tool successfully extracts your package, a folder with the same name as the `.ptp` file will be created. Simply move or copy this folder directly into your MSFS `Community` folder.
+## Manual Installation Instructions
+
+Because you are no longer using the PMDG Operations Center, you must manually place the extracted files into your simulator. The `.ptp` format is universal across all PMDG products, but the installation method depends on your simulator.
+
+### Microsoft Flight Simulator (MSFS)
+
+PMDG liveries for MSFS are typically installed into a master "liveries" package inside your Community folder. 
+
+1. **Locate your liveries package**: Find the PMDG liveries folder in your MSFS `Community` directory (e.g., `Community\pmdg-aircraft-738-liveries`).
+2. **Extract directly to it**: Run the extractor via the command line and set the output directory to that livery package folder:
+   ```cmd
+   PtpExtractor.exe "C:\path\to\livery.ptp" "C:\path\to\Community\pmdg-aircraft-738-liveries"
+   ```
+   *Note: If you use the Drag & Drop script, you can simply move the contents of the extracted folder into your PMDG liveries package folder.*
+3. **Automatic layout.json update**: The `PtpExtractor` will automatically detect the `layout.json` file in the destination directory and seamlessly merge the new texture files into it. No manual JSON editing or third-party layout generators are required!
+
+### Prepar3D (P3D) and Flight Simulator X (FSX)
+
+Older simulators use the traditional `aircraft.cfg` configuration method. When you extract a P3D/FSX `.ptp` file, you will usually see an `Aircraft.ini` file and a texture folder (e.g., `Texture.IAW_YIASE`).
+
+1. **Extract**: Use the drag-and-drop script to extract the `.ptp` file. (The tool will create a `layout.json` file which you can safely ignore or delete).
+2. **Move Textures**: Copy the extracted `Texture.XYZ` folder into your specific PMDG aircraft directory (e.g., `Prepar3D v4\SimObjects\Airplanes\PMDG 737-800NGXu`).
+3. **Update `aircraft.cfg`**: 
+   - Open the `Aircraft.ini` (or `Config.cfg`) file that the tool extracted. It contains a block of text starting with `[fltsim.x]`. Copy this entire block of text.
+   - Open the `aircraft.cfg` file located in your PMDG aircraft's `SimObjects` directory.
+   - Scroll to the bottom of the existing livery entries and paste your copied text block.
+   - **Crucial**: Change the `[fltsim.x]` header number to the next sequential number. For example, if the last entry in the file is `[fltsim.4]`, change your newly pasted header to `[fltsim.5]`.
+   - Save the `aircraft.cfg` file.
 
 ## Build Instructions
 To compile the project from source, ensure you have the .NET SDK installed.
