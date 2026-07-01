@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>PtpExtractor</AssemblyName>
+    <Description>Offline extractor for PMDG .ptp livery files.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="CabLib">
+      <HintPath>lib\CabLib.dll</HintPath>
+    </Reference>
+    <None Update="lib\CabLib.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,7 @@
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+.vs/
+*.dll
+!lib/*.dll
