@@ -1,0 +1,39 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build
+        run: dotnet build PtpExtractor.csproj -c Release
+
+      - name: Prepare Release Package
+        shell: powershell
+        run: |
+          Copy-Item Extract-Livery.bat bin/Release/net472/
+          Copy-Item README.md bin/Release/net472/
+          Compress-Archive -Path bin/Release/net472/* -DestinationPath PMDG-Livery-Extractor-${{ github.ref_name }}.zip
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: PMDG-Livery-Extractor-${{ github.ref_name }}.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
