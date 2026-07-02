@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using CabLib;
 
 namespace PtpExtractor
@@ -13,7 +14,6 @@ namespace PtpExtractor
     {
         const string DecryptionKey = "PMDG_SecurityCode";
 
-        // Layout.json data structures
         public class LayoutEntry
         {
             [JsonPropertyName("path")]
@@ -44,12 +44,33 @@ namespace PtpExtractor
             {
                 Console.WriteLine("Usage:");
                 Console.WriteLine("  PtpExtractor.exe <file.ptp> [output_dir]");
-                Console.WriteLine("\nAlternatively, drag and drop a .ptp file onto the extractor.");
+                Console.WriteLine("  PtpExtractor.exe --p3d \"C:\\Path\\To\\SimObjects\\PMDG Plane\" <file.ptp>");
+                Console.WriteLine("\nAlternatively, drag and drop a .ptp file onto the batch script.");
                 return 1;
             }
 
-            string ptpPath = Path.GetFullPath(args[0]);
-            if (!File.Exists(ptpPath))
+            string ptpPath = null;
+            string outDir = null;
+            bool forceP3d = false;
+
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (args[i].ToLower() == "--p3d" && i + 1 < args.Length)
+                {
+                    forceP3d = true;
+                    outDir = Path.GetFullPath(args[++i]);
+                }
+                else if (ptpPath == null)
+                {
+                    ptpPath = Path.GetFullPath(args[i]);
+                }
+                else if (outDir == null && !forceP3d)
+                {
+                    outDir = Path.GetFullPath(args[i]);
+                }
+            }
+
+            if (ptpPath == null || !File.Exists(ptpPath))
             {
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.Error.WriteLine($"[Error] File not found: {ptpPath}");
@@ -57,22 +78,33 @@ namespace PtpExtractor
                 return 1;
             }
 
-            string outDir = args.Length >= 2
-                ? Path.GetFullPath(args[1])
-                : Path.Combine(Path.GetDirectoryName(ptpPath)!, Path.GetFileNameWithoutExtension(ptpPath));
+            outDir = outDir ?? Path.Combine(Path.GetDirectoryName(ptpPath)!, Path.GetFileNameWithoutExtension(ptpPath));
 
             Console.WriteLine($"[+] Target File : {ptpPath}");
             Console.WriteLine($"[+] Destination : {outDir}\n");
 
             try
             {
+                bool isP3DInstall = forceP3d || File.Exists(Path.Combine(outDir, "aircraft.cfg"));
+
+                if (isP3DInstall)
+                {
+                    Console.WriteLine("[+] Automated P3D/FSX Installation detected.");
+                    InstallToP3D(ptpPath, outDir);
+                    
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("\n[+] Livery fully installed into P3D/FSX successfully!");
+                    Console.ResetColor();
+                    return 0;
+                }
+
+                // Standard extraction (and MSFS layout.json merging)
                 List<string> extractedFiles = ExtractCabinet(ptpPath, outDir);
                 
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("\n[+] Extraction completed successfully!");
                 Console.ResetColor();
 
-                // Merge with layout.json
                 UpdateLayoutJson(outDir, extractedFiles);
                 
                 Console.WriteLine($"\nYou can now copy the extracted folder into your MSFS 'Community' folder:\n{outDir}");
@@ -88,7 +120,97 @@ namespace PtpExtractor
             }
         }
 
-        static List<string> ExtractCabinet(string ptpPath, string outDir)
+        static void InstallToP3D(string ptpPath, string p3dAircraftDir)
+        {
+            if (!File.Exists(Path.Combine(p3dAircraftDir, "aircraft.cfg")))
+            {
+                throw new Exception($"aircraft.cfg not found in target directory: {p3dAircraftDir}\nPlease ensure you selected the root of the aircraft's SimObjects folder.");
+            }
+
+            string tempDir = Path.Combine(Path.GetTempPath(), "PtpExtractor_" + Guid.NewGuid().ToString());
+            Directory.CreateDirectory(tempDir);
+
+            try
+            {
+                ExtractCabinet(ptpPath, tempDir, silent: true);
+
+                // Move Texture folders
+                var dirs = Directory.GetDirectories(tempDir, "Texture.*");
+                if (dirs.Length == 0)
+                {
+                    throw new Exception("No 'Texture.*' folder found in the .ptp package.");
+                }
+
+                foreach (var d in dirs)
+                {
+                    string dest = Path.Combine(p3dAircraftDir, Path.GetFileName(d));
+                    if (Directory.Exists(dest)) Directory.Delete(dest, true);
+                    Directory.Move(d, dest);
+                    Console.WriteLine($"    -> Installed texture directory: {Path.GetFileName(d)}");
+                }
+
+                // Find livery configuration text
+                var configFiles = Directory.GetFiles(tempDir, "*.ini").Concat(Directory.GetFiles(tempDir, "*.cfg"));
+                string liveryConfigText = null;
+                foreach (var f in configFiles)
+                {
+                    string text = File.ReadAllText(f);
+                    if (text.Contains("[fltsim.", StringComparison.OrdinalIgnoreCase))
+                    {
+                        liveryConfigText = text;
+                        break;
+                    }
+                }
+
+                if (liveryConfigText == null)
+                {
+                    throw new Exception("Could not find Aircraft.ini or a [fltsim.x] block in the extracted files.");
+                }
+
+                // Extract just the fltsim block using Regex
+                var match = Regex.Match(liveryConfigText, @"(?is)(\[fltsim\.[^\]]*\].*?)(?=\n\[|$)");
+                if (!match.Success)
+                {
+                    throw new Exception("Failed to parse the [fltsim.x] block from the livery config.");
+                }
+                string fltSimBlock = match.Groups[1].Value.Trim();
+
+                // Update aircraft.cfg
+                string aircraftCfgPath = Path.Combine(p3dAircraftDir, "aircraft.cfg");
+                string aircraftCfgText = File.ReadAllText(aircraftCfgPath);
+
+                // Find max existing fltsim index
+                int maxIndex = -1;
+                var existingMatches = Regex.Matches(aircraftCfgText, @"(?i)\[fltsim\.(\d+)\]");
+                foreach (Match m in existingMatches)
+                {
+                    if (int.TryParse(m.Groups[1].Value, out int idx) && idx > maxIndex)
+                    {
+                        maxIndex = idx;
+                    }
+                }
+
+                int nextIndex = maxIndex + 1;
+
+                // Replace the header with the correct consecutive number
+                fltSimBlock = Regex.Replace(fltSimBlock, @"(?i)\[fltsim\.[^\]]*\]", $"[fltsim.{nextIndex}]");
+
+                // Ensure it ends with a newline
+                string newContent = aircraftCfgText.TrimEnd() + "\r\n\r\n" + fltSimBlock + "\r\n";
+                File.WriteAllText(aircraftCfgPath, newContent);
+
+                Console.WriteLine($"    -> Appended livery to aircraft.cfg securely as [fltsim.{nextIndex}]");
+            }
+            finally
+            {
+                if (Directory.Exists(tempDir))
+                {
+                    Directory.Delete(tempDir, true);
+                }
+            }
+        }
+
+        static List<string> ExtractCabinet(string ptpPath, string outDir, bool silent = false)
         {
             Directory.CreateDirectory(outDir);
 
@@ -101,13 +223,13 @@ namespace PtpExtractor
                 throw new Exception("Not a valid .ptp cabinet file (wrong decryption key or corrupt file).");
             }
 
-            Console.WriteLine($"[+] Cabinet verified. Contains {headerInfo.u16_Files} file(s). Extracting...\n");
+            if (!silent) Console.WriteLine($"[+] Cabinet verified. Contains {headerInfo.u16_Files} file(s). Extracting...\n");
 
             List<string> extractedFiles = new List<string>();
 
             extract.evBeforeCopyFile += (Extract.kCabinetFileInfo info) =>
             {
-                Console.WriteLine($"    -> {info.s_RelPath}");
+                if (!silent) Console.WriteLine($"    -> {info.s_RelPath}");
                 extractedFiles.Add(info.s_RelPath);
                 return true;
             };
@@ -121,7 +243,6 @@ namespace PtpExtractor
             string layoutPath = Path.Combine(baseDir, "layout.json");
             LayoutRoot layout;
 
-            // Initialize LayoutRoot
             if (File.Exists(layoutPath))
             {
                 Console.WriteLine($"\n[+] Found existing layout.json. Merging new files...");
@@ -142,11 +263,9 @@ namespace PtpExtractor
                 layout = new LayoutRoot();
             }
 
-            // Remove previous entries for the files we just extracted, to avoid duplicates
             var newFileSet = new HashSet<string>(extractedFiles.Select(f => f.Replace('\\', '/').ToLowerInvariant()));
             layout.Content.RemoveAll(entry => newFileSet.Contains(entry.Path.ToLowerInvariant()));
 
-            // Add the new entries
             foreach (var relPath in extractedFiles)
             {
                 string fullPath = Path.Combine(baseDir, relPath);
@@ -162,7 +281,6 @@ namespace PtpExtractor
                 }
             }
 
-            // Write back to disk
             var options = new JsonSerializerOptions { WriteIndented = true };
             string newJson = JsonSerializer.Serialize(layout, options);
             File.WriteAllText(layoutPath, newJson);
