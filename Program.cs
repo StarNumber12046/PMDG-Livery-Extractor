@@ -208,8 +208,18 @@ namespace PtpExtractor
                 // Replace the header with the correct consecutive number
                 fltSimBlock = Regex.Replace(fltSimBlock, @"(?i)\[fltsim\.[^\]]*\]", $"[fltsim.{nextIndex}]");
 
-                // Ensure it ends with a newline
-                string newContent = aircraftCfgText.TrimEnd() + "\r\n\r\n" + fltSimBlock + "\r\n";
+                // Insert the new block after the last [fltsim.X] block, not at the end of the file
+                int insertPos = aircraftCfgText.Length;
+                var fltsimBlockMatches = Regex.Matches(aircraftCfgText, @"(?is)\[fltsim\.\d+\].*?(?=\n\[|$)");
+                if (fltsimBlockMatches.Count > 0)
+                {
+                    var lastBlock = fltsimBlockMatches[fltsimBlockMatches.Count - 1];
+                    insertPos = lastBlock.Index + lastBlock.Length;
+                }
+
+                string before = aircraftCfgText.Substring(0, insertPos).TrimEnd();
+                string after = aircraftCfgText.Substring(insertPos).TrimStart();
+                string newContent = before + "\r\n\r\n" + fltSimBlock + "\r\n" + after;
                 File.WriteAllText(aircraftCfgPath, newContent);
 
                 Console.WriteLine($"    -> Appended livery to aircraft.cfg securely as [fltsim.{nextIndex}]");
