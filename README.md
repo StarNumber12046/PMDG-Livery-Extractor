@@ -42,17 +42,27 @@ PMDG liveries for MSFS are typically installed into a master "liveries" package 
 
 ### Prepar3D (P3D) and Flight Simulator X (FSX)
 
-Older simulators use the traditional `aircraft.cfg` configuration method. When you extract a P3D/FSX `.ptp` file, you will usually see an `Aircraft.ini` file and a texture folder (e.g., `Texture.IAW_YIASE`).
+The tool features **fully automated** legacy installation for P3D and FSX. It will automatically extract the textures, place them in the correct folder, and seamlessly append the new livery to your `aircraft.cfg` with the correct `[fltsim.X]` numbering!
 
-1. **Extract**: Use the drag-and-drop script to extract the `.ptp` file. (The tool will create a `layout.json` file which you can safely ignore or delete).
-2. **Move Textures**: Copy the extracted `Texture.XYZ` folder into your specific PMDG aircraft directory (e.g., `Prepar3D v4\SimObjects\Airplanes\PMDG 737-800NGXu`).
+To trigger the automated installer, either:
+1. Provide the root of your PMDG aircraft's `SimObjects` folder as the output directory:
+   ```cmd
+   PtpExtractor.exe "C:\path\to\livery.ptp" "C:\Program Files\Lockheed Martin\Prepar3D v4\SimObjects\Airplanes\PMDG 737-800NGXu"
+   ```
+2. Or use the explicit `--p3d` flag:
+   ```cmd
+   PtpExtractor.exe --p3d "C:\Program Files\Lockheed Martin\Prepar3D v4\SimObjects\Airplanes\PMDG 737-800NGXu" "C:\path\to\livery.ptp" 
+   ```
+
+If you prefer to extract the files locally and install them manually:
+1. **Extract**: Use the drag-and-drop script to extract the `.ptp` file locally.
+2. **Move Textures**: Copy the extracted `Texture.XYZ` folder into your specific PMDG aircraft directory.
 3. **Update `aircraft.cfg`**: 
-   - Open the `Aircraft.ini` (or `Config.cfg`) file that the tool extracted. It contains a block of text starting with `[fltsim.x]`. Copy this entire block of text.
-   - Open the `aircraft.cfg` file located in your PMDG aircraft's `SimObjects` directory.
-   - Scroll to the bottom of the existing livery entries and paste your copied text block.
-   - **Crucial**: Change the `[fltsim.x]` header number to the next sequential number. For example, if the last entry in the file is `[fltsim.4]`, change your newly pasted header to `[fltsim.5]`.
-   - Save the `aircraft.cfg` file.
-
+   - Open the extracted `Aircraft.ini` (or `Config.cfg`). Copy the block of text starting with `[fltsim.x]`.
+   - Open your aircraft's `aircraft.cfg` file.
+   - Paste the block at the bottom of the other liveries.
+   - **Crucial**: Change the `[fltsim.x]` header to the next sequential number (e.g., change it to `[fltsim.5]` if the last one was 4).
+   
 ## Build Instructions
 To compile the project from source, ensure you have the .NET SDK installed.
 
