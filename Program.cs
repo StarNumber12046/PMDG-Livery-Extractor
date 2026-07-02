@@ -141,16 +141,29 @@ namespace PtpExtractor
                     throw new Exception("No 'Texture.*' folder found in the .ptp package.");
                 }
 
+                // Move all loose files (Config.cfg, Aircraft.ini, etc.) into the Texture folder 
+                // so they are preserved and don't clutter the aircraft's root directory.
+                string primaryTextureDir = dirs.First();
+                var looseFiles = Directory.GetFiles(tempDir);
+                foreach (var file in looseFiles)
+                {
+                    string destFile = Path.Combine(primaryTextureDir, Path.GetFileName(file));
+                    if (File.Exists(destFile)) File.Delete(destFile);
+                    File.Move(file, destFile);
+                }
+
                 foreach (var d in dirs)
                 {
                     string dest = Path.Combine(p3dAircraftDir, Path.GetFileName(d));
                     if (Directory.Exists(dest)) Directory.Delete(dest, true);
                     Directory.Move(d, dest);
-                    Console.WriteLine($"    -> Installed texture directory: {Path.GetFileName(d)}");
+                    Console.WriteLine($"    -> Installed texture directory (with preserved configs): {Path.GetFileName(d)}");
                 }
 
-                // Find livery configuration text
-                var configFiles = Directory.GetFiles(tempDir, "*.ini").Concat(Directory.GetFiles(tempDir, "*.cfg"));
+                // The config file (Config.cfg) is now inside the newly moved Texture folder
+                string installedTextureDir = Path.Combine(p3dAircraftDir, Path.GetFileName(primaryTextureDir));
+                var configFiles = Directory.GetFiles(installedTextureDir, "*.cfg").Concat(Directory.GetFiles(installedTextureDir, "*.ini"));
+                
                 string liveryConfigText = null;
                 foreach (var f in configFiles)
                 {
