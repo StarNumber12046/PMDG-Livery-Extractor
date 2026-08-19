@@ -12,7 +12,7 @@ if "%~1"=="" (
 echo Starting extraction for: %~1
 echo.
 
-"%~dp0bin\Release\net472\PtpExtractor.exe" "%~1"
+"%~dp0\PtpExtractor.exe" "%~1"
 
 echo.
 pause
